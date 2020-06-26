@@ -8,24 +8,23 @@ from collections import Counter
 from heapq import heappush, heappop, heapify
 from collections import defaultdict
 
-MAGIC_NUMBER = 69# magic number for identification
+MAGIC_NUMBER = 69 # magic number for identification
 SIZE_ARR = 6
 
 
 def main():
-    archivo = 'prueba'
     parser = argparse.ArgumentParser(
         description='Comprimir archivos usando un árbol de Huffman ')  # generamos objeto parser y le damos una descripcion
-    parser.add_argument('-a', '--archivo', help='archivo a comprimir ', required=False,
-                        type=argparse.FileType('r'))  # por mientras queda false para poder correr
-    parser.add_argument('-f', '--froce', help='forzar la compresión, aunque el archivo resultante sea más grande',
-                        required=False, type=str)
+    parser.add_argument('archivo', help='archivo a comprimir ',
+                        type=argparse.FileType('r'))
+    parser.add_argument('-f', '--force', help='forzar la compresión, aunque el archivo resultante sea más grande',
+                        required=False, action="store_true")
     parser.add_argument('-v', '--verbose',
                         help='escribe en stderr información sobre el avance del proceso,por ejemplo, los bitcodes para cada símbolo',
-                        required=False, type=str)
+                        required=False, action="store_true")
 
     args = parser.parse_args()
-    file = open("archivo.huf", "wb+")
+    file = open(args.archivo.name +".huf", "wb+")
     txt = args.archivo.read()
     symb2freq = collections.Counter(txt)
     huff = encode(symb2freq)
@@ -36,19 +35,19 @@ def main():
         for tupla in list_symbols:
             print(f'{tupla[0]}   /  {tupla[1]}')
     cabezal = struct.pack('!hBBi',MAGIC_NUMBER,len(list_symbols),SIZE_ARR,len(txt)) #TODO ARREGLAR EL EMA DE QUE USA MENOS BITES
+    contador=len(cabezal)
     file.write(cabezal)
 
     encoded_table = []
     for p in huff:
         symbol = struct.pack('!B', int(format(ord(p[0]), 'd')))
         code_len = struct.pack('!B', len(p[1]))
-        code = struct.pack('!L', int(p[1], 2))
+        code = struct.pack('!i', int(p[1], 2))
         encoded_table.append([symbol, code_len, code])
-
-
 
     for c in encoded_table:
         for s in c:
+           contador = contador + len(s)
            file.write(s)
 
 
@@ -56,6 +55,8 @@ def main():
     bites=[]
     for char in txt:
         texto_codificado+=dicc_symbols[char]
+
+
     for i in range(0,len(texto_codificado),8):
         byte=texto_codificado[i:i+8]
         if len(byte)==8:
@@ -63,10 +64,21 @@ def main():
         else:
             byte += (8-len(byte))*'0'
             bites.append(int(byte,2))
+
+
+    contador=contador+len(bites)
     texto_codificado=bytes(bites)
     file.write(texto_codificado)
-    file.close()
 
+
+    if (len(txt) < contador) and not args.force:
+         file.close()
+         print("El archivo comprimido es mas grande que el original no se Comprimio")
+         os.remove(args.archivo.name +".huf")
+    else:
+        file.close()
+        print("Archivo comprimido exitosamente")
+    return 0
 
 
 def encode(symb2freq):
